@@ -49,7 +49,7 @@ NolioAPI.prototype = {
 	
 	
 	/*
-	 *  Returns an array of application names 
+	 *  Returns a list of application names available for the current user (_nacUser) from the current server (_url)   
 	 */
 	getAllApplications: function(){
 		_soapEnvelope = getNewEnvelope();	
@@ -60,12 +60,52 @@ NolioAPI.prototype = {
 		return xml.getNodeText("//ns2:name");	
 	},
 	
-	
+	/*
+	 *   Returns a list of available environments for a given Nolio Application
+	 */
+	getEnvironmentsForApplication function(app){
+		_soapEnvelope = getNewEnvelope();	
+		_soapEnvelope.createBodyElement("mod:getEnvironmentsForApplication");
+		_soapEnvelope.createElement(mod:getEnvironmentsForApplication, "mod:username", _nacUser);
+		_soapEnvelope.createElement(mod:getEnvironmentsForApplication, "mod:password", _pwd);
+		_soapEnvelope.createElement(mod:getEnvironmentsForApplication, "mod:appName", app);
+		var xml = executeSOAP(_soapEnvelope);
+		return xml.getNodeText("//ns2:name");		
+	},
 	
 	/*
-	 *	Utility methods used by the API functions
+	 *   Returns a list of process names assigned to an environment in a given application
 	 */
-	
+	 getAssignedProcessesForEnvironment function(app, env){
+	 	_soapEnvelope = getNewEnvelope();	
+		_soapEnvelope.createBodyElement("mod:getAssignedProcessesForEnvironment");
+		_soapEnvelope.createElement(mod:getAssignedProcessesForEnvironment, "mod:username", _nacUser);
+		_soapEnvelope.createElement(mod:getAssignedProcessesForEnvironment, "mod:password", _pwd);
+		_soapEnvelope.createElement(mod:getAssignedProcessesForEnvironment, "mod:appName", app);
+		_soapEnvelope.createElement(mod:getAssignedProcessesForEnvironment, "mod:envName", env);
+		var xml = executeSOAP(_soapEnvelope);
+		return xml.getNodeText("//ns2:processFullName");		
+	 },
+
+	/*
+	 *   Returns a list of hostnames hosting Nolio agents and configured for the current Nolio server (_url)
+	 */
+	getAllAgents function(){
+		_soapEnvelope = getNewEnvelope();	
+		_soapEnvelope.createBodyElement("mod:getAllAgents");
+		_soapEnvelope.createElement(mod:GetAllApplications, "mod:username", _nacUser);
+		_soapEnvelope.createElement(mod:GetAllApplications, "mod:password", _pwd);
+		var xml = executeSOAP(_soapEnvelope);
+		return xml.getNodeText("//ns2:hostName");	
+	},
+
+
+
+/*
+ *==============================================================================================================================*
+ *==================================	Utility methods used by the API functions	============================================*
+ *==============================================================================================================================*
+ */	
 	// returns a new SOAPEnvelope for fresh use 
 	getNewEnvelope: function(){
 		// Initialize the SOAPEnvelope and set the names spaces so we don't have to repeate this in every API call
