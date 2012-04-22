@@ -14,12 +14,12 @@ NolioAPI.prototype = {
 	 */	
 	initialize: function(url, username, password){
 	
-		this._url = null;
-		this._nacUser = null;
-		this._pwd = null;
-	
-		this._soapRequest = null;
-		this._soapEnvelope = null;
+		this._url = null;    	  	// the soap end point url for the Nolio automation server the current instance is attached to
+		this._nacUser = null;  		// the Nolio Automation Server user name - used per each request
+		this._pwd = null;   		// the Nolio Automation Server password - used per each request
+		this._soapRequest = null;	// a "singleton" soap request object used by the current API instance
+		this._soapEnvelope = null;	// a "singleton" soap envelope object used by the current API instance
+		this.useECC = false;		// a flag to execute soap using the Service-now ECC queue or not
 	
 	
 		if(typeof url != "undefined" && url != null){
@@ -54,8 +54,8 @@ NolioAPI.prototype = {
 	getAllApplications: function(){
 		_soapEnvelope = getNewEnvelope();	
 		_soapEnvelope.createBodyElement("mod:GetAllApplications");
-		_soapEnvelope.createElement(mod:GetAllApplications, "mod:username", _nacUser);
-		_soapEnvelope.createElement(mod:GetAllApplications, "mod:password", _pwd);
+		_soapEnvelope.createElement("mod:GetAllApplications", "mod:username", _nacUser);
+		_soapEnvelope.createElement("mod:GetAllApplications", "mod:password", _pwd);
 		var xml = executeSOAP(_soapEnvelope);
 		return xml.getNodeText("//ns2:name");	
 	},
@@ -63,12 +63,12 @@ NolioAPI.prototype = {
 	/*
 	 *   Returns a list of available environments for a given Nolio Application
 	 */
-	getEnvironmentsForApplication function(app){
+	getEnvironmentsForApplication: function(app){
 		_soapEnvelope = getNewEnvelope();	
 		_soapEnvelope.createBodyElement("mod:getEnvironmentsForApplication");
-		_soapEnvelope.createElement(mod:getEnvironmentsForApplication, "mod:username", _nacUser);
-		_soapEnvelope.createElement(mod:getEnvironmentsForApplication, "mod:password", _pwd);
-		_soapEnvelope.createElement(mod:getEnvironmentsForApplication, "mod:appName", app);
+		_soapEnvelope.createElement("mod:getEnvironmentsForApplication", "mod:username", _nacUser);
+		_soapEnvelope.createElement("mod:getEnvironmentsForApplication", "mod:password", _pwd);
+		_soapEnvelope.createElement("mod:getEnvironmentsForApplication", "mod:appName", app);
 		var xml = executeSOAP(_soapEnvelope);
 		return xml.getNodeText("//ns2:name");		
 	},
@@ -76,13 +76,13 @@ NolioAPI.prototype = {
 	/*
 	 *   Returns a list of process names assigned to an environment in a given application
 	 */
-	 getAssignedProcessesForEnvironment function(app, env){
+	 getAssignedProcessesForEnvironment: function(app, env){
 	 	_soapEnvelope = getNewEnvelope();	
 		_soapEnvelope.createBodyElement("mod:getAssignedProcessesForEnvironment");
-		_soapEnvelope.createElement(mod:getAssignedProcessesForEnvironment, "mod:username", _nacUser);
-		_soapEnvelope.createElement(mod:getAssignedProcessesForEnvironment, "mod:password", _pwd);
-		_soapEnvelope.createElement(mod:getAssignedProcessesForEnvironment, "mod:appName", app);
-		_soapEnvelope.createElement(mod:getAssignedProcessesForEnvironment, "mod:envName", env);
+		_soapEnvelope.createElement("mod:getAssignedProcessesForEnvironment", "mod:username", _nacUser);
+		_soapEnvelope.createElement("mod:getAssignedProcessesForEnvironment", "mod:password", _pwd);
+		_soapEnvelope.createElement("mod:getAssignedProcessesForEnvironment", "mod:appName", app);
+		_soapEnvelope.createElement("mod:getAssignedProcessesForEnvironment", "mod:envName", env);
 		var xml = executeSOAP(_soapEnvelope);
 		return xml.getNodeText("//ns2:processFullName");		
 	 },
@@ -90,11 +90,11 @@ NolioAPI.prototype = {
 	/*
 	 *   Returns a list of hostnames hosting Nolio agents and configured for the current Nolio server (_url)
 	 */
-	getAllAgents function(){
+	getAllAgents: function(){
 		_soapEnvelope = getNewEnvelope();	
 		_soapEnvelope.createBodyElement("mod:getAllAgents");
-		_soapEnvelope.createElement(mod:GetAllApplications, "mod:username", _nacUser);
-		_soapEnvelope.createElement(mod:GetAllApplications, "mod:password", _pwd);
+		_soapEnvelope.createElement("mod:getAllAgents", "mod:username", _nacUser);
+		_soapEnvelope.createElement("mod:getAllAgents", "mod:password", _pwd);
 		var xml = executeSOAP(_soapEnvelope);
 		return xml.getNodeText("//ns2:hostName");	
 	},
@@ -115,37 +115,68 @@ NolioAPI.prototype = {
 	   	return _soapEnvelope;	
 	},
 	
-	// executes soap requests and returns actual XML documents to the API so XPath can be used
+	// executes soap requests either directly or through the service-now ECC queue - returns XML to enable XPATH for the API
 	executeSOAP: function(envelope){
 		if(typeof envelope != "undefined" && envelope != null) {
-			_soapRequest.post(this._soapEnvelope);
+			if(useECC==false){
+				_soapRequest.post(this._soapEnvelope);
+				//return new XMLDocument(_soapRequest.getResponseDoc());
+			}else{
+				_soapRequest.post(this._soapEnvelope, true);
+				//return new XMLDocument(_soapRequest.getResponseDoc());
+			}
+			var status = request.getHttpStatus();
+			if (status != 200) {
+  				gs.log("NolioAPI - ERROR: soap error " + status);
+  				return null;
+			}
 			return new XMLDocument(_soapRequest.getResponseDoc());
 		}
 		gs.log("NolioAPI - ERROR: call to executeSOAP with null or undefined envelope");
 		return null;
 	},
 	
-	
-	/*
-	 *  setters and getters
-	 */
+/*
+ *==============================================================================================================================*
+ *==================================	Getters & Setters   	================================================================*
+ *==============================================================================================================================*
+ */		
 	getNACuser: function(){
 		return _nacUser;
+	},
+	
+	setNACuser: function(username){
+		if(typeof _nacUser != "undefined" && _nacUser != null){
+			this._nacUser = username;
+		}
+		return;
 	},
 	
 	getNACUrl: function() {
 		return _url;
 	},
 	
-	setNACuser: function(username){
+	setNACUrl: function(url){
 		if(typeof url != "undefined" && url != null){
 			this._url = url;
 		}
+		return;
 	},
-	
+
 	setNACPassword: function(pwd){
 		//TODO: understand how to properly use passwords here
 		this._pwd = pwd;
 	},
-	
+
+	getUseECC: function(){
+		return useECC;
+	},
+
+	setUseECC: function(flag){
+		if(flag!="false" && flag!="true"){
+			gs.log("NolioAPI - Warninng: Trying to set useECC to a non boolean value, ignoring.");
+			return;
+		}
+		useECC = flag;
+	}
 };
