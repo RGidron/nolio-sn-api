@@ -1,7 +1,7 @@
 /*
  *   NolioAPI - a class defined to provide integration services and interface between service-now and a Nolio Automation Server (www.noliosoft.com)
  *   Author: Ron Gidron
- *   Date: April 16, 2012
+ *   Created: April 16, 2012
  */
 
 var NolioAPI = Class.create();
