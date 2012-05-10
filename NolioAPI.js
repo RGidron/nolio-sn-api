@@ -1,5 +1,4 @@
 /*
-
  *   NolioAPI - a class defined to provide integration services and interface between service-now and a Nolio Automation Server (www.noliosoft.com)
  *   Author: Ron Gidron
  *   Created: April 16, 2012
@@ -38,6 +37,14 @@ NolioAPI.prototype = {
       this._soapEnvelope = new SOAPEnvelope();
       this._soapEnvelope.createNameSpace("xmlns:soap", "http://www.w3.org/2003/05/soap-envelope");
       this._soapEnvelope.createNameSpace("xmlns:mod", "http://model.api.dataservices.server.platform.nolio.com/");
+	  
+	  /*
+	   *		Constants for XPATH  of the Nolio API
+	   */
+	   this.GetAllApplicationsXPATH = "/soap:Envelope/soap:Body/*[local-name()='getAllApplicationsResponse']/*[local-name()='return']/*[local-name()='ApplicationWS']/*[local-name()='name']";
+	   this.getEnvironmentsForApplicationXPATH = "/soap:Envelope/soap:Body/*[local-name()='getEnvironmentsForApplicationResponse']/*[local-name()='return']/*[local-name()='EnvironmentWS']/*[local-name()='name']";
+	   this.getAssignedProcessesForEnvironmentXPATH = "/soap:Envelope/soap:Body/*[local-name()='getAssignedProcessesForEnvironmentResponse']/*[local-name()='return']/*[local-name()='ProcessWS']/*[local-name()='name']/*local-name()='processFullName'/*[local-name()='name']";
+	  
    },
    
    /*
@@ -53,13 +60,28 @@ NolioAPI.prototype = {
       this._soapEnvelope.createNameSpace("xmlns:mod", "http://model.api.dataservices.server.platform.nolio.com/");
       return this._soapEnvelope;
    },
+
+   getXpathText: function(doc, xpath) {
+      var xmlutil = Packages.com.glide.util.XMLUtil;
+      var nl = doc.selectNodes(xpath);
+      return xmlutil.getAllText(nl.item(0));
+   },
+
    
    trimNolioResponse: function(str){
    		// Get rid of the axis --uuid bullshit that is returned from Nolio's ws API			
-   		return str.substring((str.indexOf("<soap:Envelope")),(str.indexOf("</soap:Envelope>")+16));
+   		//return str.substring((str.indexOf("<soap:Envelope")),(str.indexOf("</soap:Envelope>")+16));
+      var xml_str = str.substring((str.indexOf("<soap:Envelope")),(str.indexOf("</soap:Envelope>")+16));      
+      return new XMLDocument(xml_str,true);
    },
    
-
+   printAPINodeListToGSLog: function(apicall, nodelist){
+       gs.log("Nolio API Message from " + apicall + ". returning " + nodelist.getLength() + " elements. Values are: "); 
+       for (i = 0; i <  nodelist.getLength(); i++){
+        gs.log( apicall + "node[" + i +"] text:" + nodelist.item(i).getLastChild().getNodeValue());
+       }
+   },
+   
    // executes soap requests either directly or through the service-now ECC queue - returns XML to enable XPATH for the API
    executeSOAP: function(envelope){
       var xml = "";
@@ -67,12 +89,12 @@ NolioAPI.prototype = {
          if(this.useECC==false){
             this._soapRequest.post(envelope);
             xml = this.trimNolioResponse(this._soapRequest.getResponseDoc());
-            gs.log("Nolio API Message: ExecuteSOAP (useECC false) returns: " + xml); 
+            //gs.log("Nolio API Message: ExecuteSOAP (useECC false) returns: " + xml); 
             return xml;
          }else{
             this._soapRequest.post(envelope, true);
             xml = this.trimNolioResponse(envelope.getResponse());
-            gs.log("Nolio API Message: ExecuteSOAP (useECC true) returns: " + xml);             
+            //gs.log("Nolio API Message: ExecuteSOAP (useECC true) returns: " + xml);             
             return xml; 
          }
       }
@@ -133,36 +155,58 @@ NolioAPI.prototype = {
       _soapEnvelope.createElement(mod, "mod:username", this._nacUser);
       _soapEnvelope.createElement(mod, "mod:password", this._pwd);
       var xml = this.executeSOAP(_soapEnvelope);
-      var str = gs.getXMLText(xml, "/getAllApplicationsResponse/return/ApplicationWS/name");
-      gs.log("Nolio API Message: getAllApplications returns:" + str); 
-      return str;
+      //setting namespaces
+      xml.setAttribute("xmlns:soap","http://schemas.xmlsoap.org/soap/envelope/");
+      xml.setAttribute("xmlns:ns1", "http://model.api.dataservices.server.platform.nolio.com/");
+      xml.setAttribute("xmlns:ns2", "http://dto.webservice.model.api.dataservices.server.platform.nolio.com");
+      
+      var nodelist = xml.getNodes(this.GetAllApplicationsXPATH); // two, three, and two
+      this.printAPINodeListToGSLog("getAllApplications", nodelist);
+      return nodelist;
    },
    
    /*
     *   Returns a list of available environments for a given Nolio Application
     */
    getEnvironmentsForApplication: function(app){
-      var _soapEnvelope = getNewEnvelope();
+      var _soapEnvelope = this.getNewEnvelope();
       var mod = _soapEnvelope.createBodyElement("mod:getEnvironmentsForApplication");
       _soapEnvelope.createElement(mod, "mod:username", this._nacUser);
       _soapEnvelope.createElement(mod, "mod:password", this._pwd);
       _soapEnvelope.createElement(mod, "mod:appName", app);
-      var xml = executeSOAP(_soapEnvelope);
-      return xml.getNodeText("//ns2:name");
+      var xml = this.executeSOAP(_soapEnvelope);
+      
+	  //setting namespaces
+      xml.setAttribute("xmlns:soap","http://schemas.xmlsoap.org/soap/envelope/");
+      xml.setAttribute("xmlns:ns1", "http://model.api.dataservices.server.platform.nolio.com/");
+      xml.setAttribute("xmlns:ns2", "http://dto.webservice.model.api.dataservices.server.platform.nolio.com");
+      
+      var nodelist = xml.getNodes(this.getEnvironmentsForApplicationXPATH); 
+      this.printAPINodeListToGSLog("getEnvironmentsForApplication", nodelist);
+      return nodelist;
+
    },
    
    /*
     *   Returns a list of process names assigned to an environment in a given application
     */
    getAssignedProcessesForEnvironment: function(app, env){
-      var _soapEnvelope = getNewEnvelope();
+      var _soapEnvelope = this.getNewEnvelope();
       var mod = _soapEnvelope.createBodyElement("mod:getAssignedProcessesForEnvironment");
       _soapEnvelope.createElement(mod, "mod:username", this._nacUser);
       _soapEnvelope.createElement(mod, "mod:password", this._pwd);
       _soapEnvelope.createElement(mod, "mod:appName", app);
       _soapEnvelope.createElement(mod, "mod:envName", env);
       var xml = executeSOAP(_soapEnvelope);
-      return xml.getNodeText("//ns2:processFullName");
+	  //setting namespaces
+      xml.setAttribute("xmlns:soap","http://schemas.xmlsoap.org/soap/envelope/");
+      xml.setAttribute("xmlns:ns1", "http://model.api.dataservices.server.platform.nolio.com/");
+      xml.setAttribute("xmlns:ns2", "http://dto.webservice.model.api.dataservices.server.platform.nolio.com");
+      
+      var nodelist = xml.getNodes(this.getAssignedProcessesForEnvironmentXPATH); 
+      this.printAPINodeListToGSLog("getAssignedProcessesForEnvironment", nodelist);
+      return nodelist;
+	  
    },
    
    /*
@@ -178,4 +222,4 @@ NolioAPI.prototype = {
    }
 };
 
-NolioAPI.prototype.useECC = false;
+NolioAPI.prototype.useECC = true;
